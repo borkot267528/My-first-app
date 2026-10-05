@@ -1,13 +1,13 @@
 workflows:
-  # ------------------------------------------------------------
+  # ============================================================
   # Aura Voice Chat - Debug APK
-  # No release keystore is required for this workflow.
-  # Use this first to verify that the Android project builds.
-  # ------------------------------------------------------------
+  # Free-plan friendly: uses Codemagic macOS M2 instance.
+  # No release keystore is required.
+  # ============================================================
   android-debug:
     name: Aura Voice Chat - Debug APK
     max_build_duration: 60
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
 
     environment:
       node: 20
@@ -55,29 +55,15 @@ workflows:
       - android/app/build/outputs/logs/**/*.txt
 
 
-  # ------------------------------------------------------------
+  # ============================================================
   # Aura Voice Chat - Signed Release APK
-  #
-  # BEFORE running this workflow:
-  # 1. Upload your Android keystore in Codemagic:
-  #    Team/Project settings -> Code signing identities
-  # 2. Set its reference name to:
-  #       aura_release_keystore
-  #
-  # Codemagic will provide:
-  #   CM_KEYSTORE_PATH
-  #   CM_KEYSTORE_PASSWORD
-  #   CM_KEY_ALIAS
-  #   CM_KEY_PASSWORD
-  #
-  # The current android/app/build.gradle in this project expects
-  # CM_KEYSTORE for the keystore path, so the build script maps
-  # CM_KEYSTORE_PATH -> CM_KEYSTORE before Gradle runs.
-  # ------------------------------------------------------------
+  # Requires an Android keystore configured in Codemagic with
+  # reference name: aura_release_keystore
+  # ============================================================
   android-release:
     name: Aura Voice Chat - Signed Release APK
     max_build_duration: 60
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
 
     environment:
       node: 20
@@ -133,10 +119,7 @@ workflows:
 
       - name: Build signed release APK
         script: |
-          # The existing android/app/build.gradle expects CM_KEYSTORE
-          # as the keystore file path. Codemagic provides CM_KEYSTORE_PATH.
           export CM_KEYSTORE="$CM_KEYSTORE_PATH"
-
           cd android
           ./gradlew --no-daemon clean assembleRelease
 
