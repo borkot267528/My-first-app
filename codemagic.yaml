@@ -1,0 +1,215 @@
+workflows:
+  android-debug:
+    name: Aura Voice Chat - Debug APK
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20
+      java: 17
+      vars:
+        APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
+        NODE_ENV: "production"
+        DISABLE_HMR: "true"
+
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+
+    scripts:
+      - name: Prepare project from ZIP if needed
+        script: |
+          set -e
+          if [ -f package.json ]; then
+            echo "Project files already extracted."
+          else
+            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)"
+            if [ -z "$ZIP_FILE" ]; then
+              echo "ERROR: No package.json and no project ZIP was found."
+              exit 1
+            fi
+            echo "Extracting project from: $ZIP_FILE"
+            rm -rf "$CM_BUILD_DIR/aura-src"
+            mkdir -p "$CM_BUILD_DIR/aura-src"
+            unzip -q "$ZIP_FILE" -d "$CM_BUILD_DIR/aura-src"
+            if [ ! -f "$CM_BUILD_DIR/aura-src/package.json" ]; then
+              NESTED_DIR="$(find "$CM_BUILD_DIR/aura-src" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+              if [ -n "$NESTED_DIR" ] && [ -f "$NESTED_DIR/package.json" ]; then
+                echo "Project is inside: $NESTED_DIR"
+                rm -rf "$CM_BUILD_DIR/aura-src/project"
+                mv "$NESTED_DIR" "$CM_BUILD_DIR/aura-src/project"
+                # Remove any other extracted wrapper content only if unnecessary.
+              fi
+            fi
+          fi
+
+          if [ -f package.json ]; then
+            APP_DIR="$CM_BUILD_DIR"
+          else
+            APP_DIR="$CM_BUILD_DIR/aura-src"
+            if [ ! -f "$APP_DIR/package.json" ]; then
+              APP_DIR="$(find "$CM_BUILD_DIR/aura-src" -name package.json -type f -print -quit | xargs -r dirname)"
+            fi
+          fi
+
+          if [ -z "$APP_DIR" ] || [ ! -f "$APP_DIR/package.json" ]; then
+            echo "ERROR: package.json could not be located after extraction."
+            exit 1
+          fi
+
+          echo "Using application directory: $APP_DIR"
+          echo "$APP_DIR" > "$CM_BUILD_DIR/.aura_app_dir"
+
+      - name: Install Node dependencies
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR"
+          npm install --no-audit --no-fund
+
+      - name: Build web application
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR"
+          npm run build
+
+      - name: Sync Capacitor Android project
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR"
+          npx cap sync android
+
+      - name: Configure Android SDK location
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$APP_DIR/android/local.properties"
+
+      - name: Make Gradle wrapper executable
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          chmod +x "$APP_DIR/android/gradlew"
+
+      - name: Build debug APK
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR/android"
+          ./gradlew --no-daemon assembleDebug
+
+    artifacts:
+      - "**/android/app/build/outputs/apk/debug/*.apk"
+      - "**/android/app/build/outputs/logs/**/*.txt"
+
+
+  android-release:
+    name: Aura Voice Chat - Signed Release APK
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20
+      java: 17
+      android_signing:
+        - aura_release_keystore
+      vars:
+        APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
+        NODE_ENV: "production"
+        DISABLE_HMR: "true"
+
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+
+    scripts:
+      - name: Prepare project from ZIP if needed
+        script: |
+          set -e
+          if [ -f package.json ]; then
+            APP_DIR="$CM_BUILD_DIR"
+          else
+            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)"
+            if [ -z "$ZIP_FILE" ]; then
+              echo "ERROR: No package.json and no project ZIP was found."
+              exit 1
+            fi
+            rm -rf "$CM_BUILD_DIR/aura-src"
+            mkdir -p "$CM_BUILD_DIR/aura-src"
+            unzip -q "$ZIP_FILE" -d "$CM_BUILD_DIR/aura-src"
+            APP_DIR="$CM_BUILD_DIR/aura-src"
+            if [ ! -f "$APP_DIR/package.json" ]; then
+              APP_DIR="$(find "$CM_BUILD_DIR/aura-src" -name package.json -type f -print -quit | xargs -r dirname)"
+            fi
+          fi
+          if [ -z "$APP_DIR" ] || [ ! -f "$APP_DIR/package.json" ]; then
+            echo "ERROR: package.json could not be located."
+            exit 1
+          fi
+          echo "Using application directory: $APP_DIR"
+          echo "$APP_DIR" > "$CM_BUILD_DIR/.aura_app_dir"
+
+      - name: Install Node dependencies
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR"
+          npm install --no-audit --no-fund
+
+      - name: Build web application
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR"
+          npm run build
+
+      - name: Verify production backend URL
+        script: |
+          test -n "$APP_URL"
+          echo "Using configured production backend: $APP_URL"
+
+      - name: Sync Capacitor Android project
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          cd "$APP_DIR"
+          npx cap sync android
+
+      - name: Configure Android SDK location
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$APP_DIR/android/local.properties"
+
+      - name: Verify Android signing credentials
+        script: |
+          test -n "$CM_KEYSTORE_PATH"
+          test -n "$CM_KEYSTORE_PASSWORD"
+          test -n "$CM_KEY_ALIAS"
+          test -n "$CM_KEY_PASSWORD"
+          echo "Android signing identity is available."
+
+      - name: Make Gradle wrapper executable
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          chmod +x "$APP_DIR/android/gradlew"
+
+      - name: Build signed release APK
+        script: |
+          set -e
+          APP_DIR="$(cat "$CM_BUILD_DIR/.aura_app_dir")"
+          export CM_KEYSTORE="$CM_KEYSTORE_PATH"
+          cd "$APP_DIR/android"
+          ./gradlew --no-daemon clean assembleRelease
+
+    artifacts:
+      - "**/android/app/build/outputs/apk/release/*.apk"
+      - "**/android/app/build/outputs/mapping/release/**/*"
+      - "**/android/app/build/outputs/logs/**/*.txt"
