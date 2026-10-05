@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      node: 20
+      node: 22
       java: 17
       vars:
         APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
