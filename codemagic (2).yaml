@@ -1,0 +1,154 @@
+workflows:
+  # ------------------------------------------------------------
+  # Aura Voice Chat - Debug APK
+  # No release keystore is required for this workflow.
+  # Use this first to verify that the Android project builds.
+  # ------------------------------------------------------------
+  android-debug:
+    name: Aura Voice Chat - Debug APK
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      node: 20
+      java: 17
+      vars:
+        APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
+        NODE_ENV: "production"
+        DISABLE_HMR: "true"
+
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm install --no-audit --no-fund
+
+      - name: Build web application
+        script: |
+          npm run build
+
+      - name: Sync Capacitor Android project
+        script: |
+          npx cap sync android
+
+      - name: Configure Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+
+      - name: Make Gradle wrapper executable
+        script: |
+          chmod +x android/gradlew
+
+      - name: Build debug APK
+        script: |
+          cd android
+          ./gradlew --no-daemon assembleDebug
+
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+      - android/app/build/outputs/apk/**/*.apk
+      - android/app/build/outputs/logs/**/*.txt
+
+
+  # ------------------------------------------------------------
+  # Aura Voice Chat - Signed Release APK
+  #
+  # BEFORE running this workflow:
+  # 1. Upload your Android keystore in Codemagic:
+  #    Team/Project settings -> Code signing identities
+  # 2. Set its reference name to:
+  #       aura_release_keystore
+  #
+  # Codemagic will provide:
+  #   CM_KEYSTORE_PATH
+  #   CM_KEYSTORE_PASSWORD
+  #   CM_KEY_ALIAS
+  #   CM_KEY_PASSWORD
+  #
+  # The current android/app/build.gradle in this project expects
+  # CM_KEYSTORE for the keystore path, so the build script maps
+  # CM_KEYSTORE_PATH -> CM_KEYSTORE before Gradle runs.
+  # ------------------------------------------------------------
+  android-release:
+    name: Aura Voice Chat - Signed Release APK
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      node: 20
+      java: 17
+
+      android_signing:
+        - aura_release_keystore
+
+      vars:
+        APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
+        NODE_ENV: "production"
+        DISABLE_HMR: "true"
+
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          npm install --no-audit --no-fund
+
+      - name: Build web application
+        script: |
+          npm run build
+
+      - name: Verify production backend URL
+        script: |
+          test -n "$APP_URL"
+          echo "Using configured production backend: $APP_URL"
+
+      - name: Sync Capacitor Android project
+        script: |
+          npx cap sync android
+
+      - name: Configure Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+
+      - name: Verify Android signing credentials
+        script: |
+          test -n "$CM_KEYSTORE_PATH"
+          test -n "$CM_KEYSTORE_PASSWORD"
+          test -n "$CM_KEY_ALIAS"
+          test -n "$CM_KEY_PASSWORD"
+          echo "Android signing identity is available."
+
+      - name: Make Gradle wrapper executable
+        script: |
+          chmod +x android/gradlew
+
+      - name: Build signed release APK
+        script: |
+          # The existing android/app/build.gradle expects CM_KEYSTORE
+          # as the keystore file path. Codemagic provides CM_KEYSTORE_PATH.
+          export CM_KEYSTORE="$CM_KEYSTORE_PATH"
+
+          cd android
+          ./gradlew --no-daemon clean assembleRelease
+
+      - name: Verify release APK
+        script: |
+          APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          test -f "$APK"
+          echo "Release APK created: $APK"
+          ls -lh "$APK"
+
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/mapping/release/**/*
+      - android/app/build/outputs/logs/**/*.txt
