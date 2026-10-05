@@ -1,0 +1,233 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Aura platform user account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "host", "agency", "bd", "manager", "super_admin", "ceo", "gm", "coo", "cto", "admin", "official_staff", "customer_service", "finance_auditor", "room_monitor", "community_mod"] },
+        "coins": { "type": "number" },
+        "diamonds": { "type": "number" },
+        "vipLevel": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "banned", "suspended"] },
+        "banReason": { "type": "string" },
+        "banType": { "type": "string" },
+        "banExpiresAt": { "type": "string" },
+        "bannedByName": { "type": "string" },
+        "bannedByRole": { "type": "string" },
+        "bannedAt": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "level": { "type": "number" },
+        "sendingLevel": { "type": "number" },
+        "receivingLevel": { "type": "number" },
+        "bio": { "type": "string" },
+        "country": { "type": "string" },
+        "phone": { "type": "string" },
+        "countryId": { "type": "string" },
+        "countryCode": { "type": "string" },
+        "dialCode": { "type": "string" },
+        "currencyCode": { "type": "string" },
+        "countryFlag": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Country": {
+      "title": "Country",
+      "description": "Platform supported country configuration for registration, currency, recharge, and withdrawals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "countryCode": { "type": "string" },
+        "iso2": { "type": "string" },
+        "iso3": { "type": "string" },
+        "dialCode": { "type": "string" },
+        "flag": { "type": "string" },
+        "currencyName": { "type": "string" },
+        "currencyCode": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "defaultLanguage": { "type": "string" },
+        "timezone": { "type": "string" },
+        "status": { "type": "string", "enum": ["enabled", "disabled"] },
+        "registrationAllowed": { "type": "boolean" },
+        "loginAllowed": { "type": "boolean" },
+        "rechargeAllowed": { "type": "boolean" },
+        "withdrawalAllowed": { "type": "boolean" },
+        "voiceRoomAllowed": { "type": "boolean" },
+        "paymentMethods": { "type": "array", "items": { "type": "string" } },
+        "withdrawalMethods": { "type": "array", "items": { "type": "string" } },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["name", "iso2", "iso3", "dialCode", "currencyCode", "currencySymbol", "status"]
+    },
+    "AdminAppearance": {
+      "title": "AdminAppearance",
+      "description": "Admin panel appearance and background styling configuration",
+      "type": "object",
+      "properties": {
+        "backgroundColor": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "updatedByName": { "type": "string" },
+        "updatedByRole": { "type": "string" }
+      },
+      "required": ["backgroundColor", "updatedAt", "updatedBy"]
+    },
+    "Connection": {
+      "title": "Connection",
+      "description": "Established social connection records (CP or Friend)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["friend", "cp"] },
+        "user1Id": { "type": "string" },
+        "user2Id": { "type": "string" },
+        "level": { "type": "number" },
+        "intimacyPoints": { "type": "number" },
+        "sharedGiftsCount": { "type": "number" },
+        "sharedGiftsCoins": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "terminated"] },
+        "establishedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "type", "user1Id", "user2Id", "status", "establishedAt"]
+    },
+    "ConnectionRequest": {
+      "title": "ConnectionRequest",
+      "description": "Incoming and outgoing connection requests (Friend or CP)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["friend", "cp"] },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined", "cancelled"] },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "type", "senderId", "receiverId", "status", "createdAt"]
+    },
+    "BlockedUser": {
+      "title": "BlockedUser",
+      "description": "User block list records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "blockedUserId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "blockedUserId", "createdAt"]
+    },
+    "GiftInventoryItem": {
+      "title": "GiftInventoryItem",
+      "description": "User personal gift backpack inventory item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "giftId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "acquiredAt": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "required": ["id", "userId", "giftId", "quantity", "acquiredAt"]
+    },
+    "WalletRecord": {
+      "title": "WalletRecord",
+      "description": "User persistent wallet balance and recharge records in Firebase",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "coins": { "type": "number" },
+        "diamonds": { "type": "number" },
+        "totalRecharged": { "type": "number" },
+        "lastRechargedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "coins", "diamonds", "updatedAt"]
+    },
+    "WalletTransactionRecord": {
+      "title": "WalletTransactionRecord",
+      "description": "Record of coin recharges, deductions, and transfers stored in Firebase",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "balanceAfter": { "type": "number" },
+        "description": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "type", "amount", "currency", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile information"
+    },
+    "/users/{userId}/giftInventory/{itemId}": {
+      "schema": "GiftInventoryItem",
+      "description": "User personal gift backpack inventory items"
+    },
+    "/wallets/{userId}": {
+      "schema": "WalletRecord",
+      "description": "User persistent wallet currency document in Firebase"
+    },
+    "/wallets/{userId}/transactions/{txId}": {
+      "schema": "WalletTransactionRecord",
+      "description": "User wallet transaction audit ledger in Firebase"
+    },
+    "/countries/{countryId}": {
+      "schema": "Country",
+      "description": "Country management configuration including currency, dial code, payment methods, and permissions"
+    },
+    "/adminSettings/{settingId}": {
+      "schema": "AdminAppearance",
+      "description": "Administrative system settings including appearance and theme configuration"
+    },
+    "/permissionModules/{moduleId}": {
+      "schema": "AdminAppearance",
+      "description": "System RBAC module definitions"
+    },
+    "/permissions/{permissionId}": {
+      "schema": "AdminAppearance",
+      "description": "System granular permission definitions"
+    },
+    "/roles/{roleId}": {
+      "schema": "AdminAppearance",
+      "description": "System dynamic role configurations"
+    },
+    "/staffOverrides/{overrideId}": {
+      "schema": "AdminAppearance",
+      "description": "Specific staff permission overrides"
+    },
+    "/connections/{connectionId}": {
+      "schema": "Connection",
+      "description": "Established social connection records (CP or Friend)"
+    },
+    "/connectionRequests/{requestId}": {
+      "schema": "ConnectionRequest",
+      "description": "Social connection requests between users"
+    },
+    "/blockedUsers/{blockId}": {
+      "schema": "BlockedUser",
+      "description": "Blocked user list records"
+    }
+  }
+}

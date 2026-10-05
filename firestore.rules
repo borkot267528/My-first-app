@@ -1,0 +1,202 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // HELPER FUNCTIONS & EIGHT PILLARS
+    // ==========================================
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && (
+        request.auth.uid == userId || 
+        (resource != null && resource.data != null && (resource.data.firebaseUid == request.auth.uid || resource.data.uid == request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
+    }
+
+    function getUserDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function getUserRole(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid)) 
+        ? getUserDoc(uid).data.role 
+        : 'user';
+    }
+
+    function isCEO() {
+      return isSignedIn() && (
+        request.auth.uid == '2383452' || 
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'imoborkot@gmail.com') ||
+        getUserRole(request.auth.uid) == 'ceo'
+      );
+    }
+
+    function isStaff() {
+      return isSignedIn() && (
+        isCEO() || 
+        getUserRole(request.auth.uid) in [
+          'super_admin', 'admin', 'gm', 'coo', 'cto', 
+          'official_staff', 'manager', 'finance_auditor', 
+          'room_monitor', 'customer_service', 'agency', 'bd'
+        ]
+      );
+    }
+
+    // Validation Blueprint for User Document Creation
+    function isValidUserCreate(userId, data) {
+      return (isOwner(userId) || isCEO())
+        && data.keys().hasAll(['uid', 'name', 'email', 'role'])
+        && data.uid is string && data.uid.size() >= 3 && data.uid.size() <= 64
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.email is string && data.email.size() >= 5 && data.email.size() <= 150
+        // Normal user registration MUST have role 'user'; CEO can assign initial role
+        && (isCEO() || data.role == 'user')
+        // Prevent arbitrary coin inflation on client registration
+        && (!('coins' in data) || (data.coins is number && data.coins >= 0 && data.coins <= 10000000))
+        && (!('diamonds' in data) || (data.diamonds is number && data.diamonds >= 0 && data.diamonds <= 5000000));
+    }
+
+    // Validation Blueprint for User Document Update
+    function isValidUserUpdate(userId) {
+      let diff = request.resource.data.diff(resource.data);
+      let affected = diff.affectedKeys();
+
+      // Case 1: Staff / CEO can update administrative fields (status, ban, notes, etc.)
+      let staffAllowed = isStaff();
+
+      // Case 2: Normal user updating own profile, custom User ID & currency
+      // Allowed fields include profile info, custom User ID, online state, and wallet balance
+      let selfAllowed = (isOwner(userId) || isCEO()) && affected.hasOnly([
+        'name', 'uid', 'nigoId', 'avatar', 'bio', 'gender', 'country', 
+        'countryFlag', 'countryCode', 'dialCode', 'phone', 
+        'isOnline', 'lastActive', 'updatedAt', 'coins', 'diamonds',
+        'totalRecharged', 'lastRechargedAt', 'frame'
+      ]) && (!('coins' in request.resource.data) || (request.resource.data.coins is number && request.resource.data.coins >= 0))
+         && (!('diamonds' in request.resource.data) || (request.resource.data.diamonds is number && request.resource.data.diamonds >= 0))
+         && (!('uid' in request.resource.data) || (request.resource.data.uid is string && request.resource.data.uid.size() >= 3 && request.resource.data.uid.size() <= 30));
+
+      return staffAllowed || selfAllowed;
+    }
+
+    // ==========================================
+    // COLLECTION RULES
+    // ==========================================
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if true;
+      allow create: if isValidId(userId) && isValidUserCreate(userId, request.resource.data);
+      allow update: if isValidId(userId) && isValidUserUpdate(userId);
+      allow delete: if isCEO();
+
+      // User Gift Inventory (Backpack) Subcollection
+      match /giftInventory/{itemId} {
+        allow get: if isValidId(itemId) && (isOwner(userId) || isStaff());
+        allow list: if isOwner(userId) || isStaff();
+        allow create, update, delete: if isValidId(itemId) && (isOwner(userId) || isStaff());
+      }
+    }
+
+    // 2. Countries Collection
+    match /countries/{countryId} {
+      // Anyone can read countries (necessary for phone dial codes, registration lists)
+      allow get: if isValidId(countryId);
+      allow list: if true;
+      allow create, update, delete: if isStaff() && isValidId(countryId);
+    }
+
+    // Connection validation test document
+    match /test/{testId} {
+      allow read: if true;
+    }
+
+    // 3. Admin Appearance & System Settings
+    match /adminSettings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if true;
+      allow write: if isStaff() && isValidId(settingId);
+    }
+
+    // 4. Dynamic RBAC Collections
+    match /permissionModules/{moduleId} {
+      allow get: if isValidId(moduleId);
+      allow list: if true;
+      allow write: if isStaff() && isValidId(moduleId);
+    }
+
+    match /permissions/{permissionId} {
+      allow get: if isValidId(permissionId);
+      allow list: if true;
+      allow write: if isStaff() && isValidId(permissionId);
+    }
+
+    match /roles/{roleId} {
+      allow get: if isValidId(roleId);
+      allow list: if true;
+      allow write: if isCEO() && isValidId(roleId);
+    }
+
+    match /staffOverrides/{overrideId} {
+      allow get: if isValidId(overrideId);
+      allow list: if true;
+      allow write: if isCEO() && isValidId(overrideId);
+    }
+
+    // 5. Social Connections (Friends & CP)
+    match /connections/{connectionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.resource.data.user1Id == request.auth.uid || request.resource.data.user2Id == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid || isStaff());
+      allow delete: if isSignedIn() && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid || isStaff());
+    }
+
+    // 6. Connection Requests (Friend & CP Requests)
+    match /connectionRequests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid || isStaff());
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        (resource.data.senderId == request.auth.uid && request.resource.data.status == 'cancelled') ||
+        (resource.data.receiverId == request.auth.uid && (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined')) ||
+        isStaff()
+      );
+      allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid || isStaff());
+    }
+
+    // 7. Blocked Users
+    match /blockedUsers/{blockId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+    }
+
+    // 8. User Wallets Collection (Persistent Currency Storage & Transactions)
+    match /wallets/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isStaff());
+      allow list: if isStaff();
+      allow create, update: if isValidId(userId) && (isOwner(userId) || isStaff());
+      allow delete: if isCEO();
+
+      match /transactions/{txId} {
+        allow get: if isValidId(txId) && (isOwner(userId) || isStaff());
+        allow list: if isOwner(userId) || isStaff();
+        allow create: if isValidId(txId) && (isOwner(userId) || isStaff());
+        allow update, delete: if isStaff();
+      }
+    }
+
+    // 9. Default Deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

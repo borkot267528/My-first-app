@@ -1,0 +1,6 @@
+{
+  "name": "Aura Voice Chat",
+  "description": "Premium Android-style Voice Chat platform featuring live voice rooms, PK battles, virtual gifts, families, lucky bags, daily spins, wallet, role-based staff permissions, and real-time backend API.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

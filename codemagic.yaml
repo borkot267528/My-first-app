@@ -1,104 +1,34 @@
 workflows:
-  android-debug:
-    name: Aura Voice Chat - Debug APK
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-    environment:
-      node: 22
-      java: 17
-      vars:
-        APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
-        NODE_ENV: "production"
-        DISABLE_HMR: "true"
-    cache:
-      cache_paths:
-        - $HOME/.npm
-        - $HOME/.gradle/caches
-        - $HOME/.gradle/wrapper
-    scripts:
-      - name: Install Node dependencies
-        script: |
-          npm install --no-audit --no-fund
-      - name: Build web application
-        script: |
-          npm run build
-      - name: Sync Capacitor Android project
-        script: |
-          npx cap sync android
-      - name: Build Android debug APK with Gradle 8.14.3
-        script: |
-          set -e
-          GRADLE_VERSION="8.14.3"
-          GRADLE_HOME="$CM_BUILD_DIR/.gradle-dist/gradle-$GRADLE_VERSION"
-          if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
-            mkdir -p "$CM_BUILD_DIR/.gradle-dist"
-            curl -fL --retry 3 "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$CM_BUILD_DIR/.gradle-dist/gradle.zip"
-            rm -rf "$GRADLE_HOME"
-            unzip -q "$CM_BUILD_DIR/.gradle-dist/gradle.zip" -d "$CM_BUILD_DIR/.gradle-dist"
-          fi
-          "$GRADLE_HOME/bin/gradle" --version
-          cd "$CM_BUILD_DIR/android"
-          "$GRADLE_HOME/bin/gradle" --no-daemon assembleDebug
-    artifacts:
-      - android/app/build/outputs/apk/debug/*.apk
-      - android/app/build/outputs/apk/**/*.apk
-      - android/app/build/outputs/logs/**/*.txt
-
   android-release:
-    name: Aura Voice Chat - Signed Release APK
+    name: Android Release Build
     max_build_duration: 60
-    instance_type: mac_mini_m2
+    instance_type: linux_x2
     environment:
-      node: 22
-      java: 17
-      android_signing:
-        - aura_release_keystore
-      vars:
-        APP_URL: "https://ais-pre-iilcebmw4madl2gy2lpdl6-259473150381.asia-east1.run.app"
-        NODE_ENV: "production"
-        DISABLE_HMR: "true"
-    cache:
-      cache_paths:
-        - $HOME/.npm
-        - $HOME/.gradle/caches
-        - $HOME/.gradle/wrapper
+      node: 20
+      java: 21
+      groups:
+        # Define 'android_credentials' in Codemagic UI (Application > Environment variables)
+        # to securely provide: CM_KEYSTORE, CM_KEYSTORE_PASSWORD, CM_KEY_ALIAS, CM_KEY_PASSWORD
+        - android_credentials
     scripts:
       - name: Install Node dependencies
         script: |
-          npm install --no-audit --no-fund
-      - name: Build web application
+          npm ci || npm install
+      - name: Run web build
         script: |
           npm run build
-      - name: Sync Capacitor Android project
+      - name: Run Capacitor sync
         script: |
           npx cap sync android
-      - name: Verify Android signing credentials
+      - name: Configure Android SDK location
         script: |
-          test -n "$CM_KEYSTORE_PATH"
-          test -n "$CM_KEYSTORE_PASSWORD"
-          test -n "$CM_KEY_ALIAS"
-          test -n "$CM_KEY_PASSWORD"
-      - name: Build signed release APK with Gradle 8.14.3
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+      - name: Make Gradle wrapper executable
         script: |
-          set -e
-          GRADLE_VERSION="8.14.3"
-          GRADLE_HOME="$CM_BUILD_DIR/.gradle-dist/gradle-$GRADLE_VERSION"
-          if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
-            mkdir -p "$CM_BUILD_DIR/.gradle-dist"
-            curl -fL --retry 3 "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$CM_BUILD_DIR/.gradle-dist/gradle.zip"
-            rm -rf "$GRADLE_HOME"
-            unzip -q "$CM_BUILD_DIR/.gradle-dist/gradle.zip" -d "$CM_BUILD_DIR/.gradle-dist"
-          fi
-          export CM_KEYSTORE="$CM_KEYSTORE_PATH"
-          cd "$CM_BUILD_DIR/android"
-          "$GRADLE_HOME/bin/gradle" --no-daemon clean assembleRelease
-      - name: Verify release APK
+          chmod +x android/gradlew
+      - name: Build Android release APK
         script: |
-          APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
-          test -n "$APK"
-          test -f "$APK"
-          ls -lh "$APK"
+          cd android
+          ./gradlew assembleRelease
     artifacts:
-      - android/app/build/outputs/apk/release/*.apk
-      - android/app/build/outputs/mapping/release/**/*
-      - android/app/build/outputs/logs/**/*.txt
+      - android/app/build/outputs/**/*.apk
